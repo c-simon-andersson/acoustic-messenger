@@ -2,7 +2,7 @@ clear; close; clc;
 %bits = [0 0 1 1 0 0 0 1 1 1 0 0];
 bits = [1 1 0 0 1 1];
 symbols = [0 1];
-SNR = 10;
+SNR = 1;
 fc = 1000;
 
 %TODO: Implement symbol coding
@@ -40,7 +40,7 @@ ylabel('Amplitude')
 d = fdesign.lowpass('Fp,Fst,Ap,Ast', 1/n,2/n,0.1,60);
 Hd = design(d, 'butter');
 yc = baseband2coscarrier(y, fc, t);
-yb = coscarrier2baseband(yc, fc, t, Hd);
+yb = coscarrier2baseband(yc, fc+fc*0.01, t, Hd);
 
 % Plot waveform at carrier and baseband
 figure
@@ -54,7 +54,7 @@ xlabel('Time (s)');
 ylabel('Amplitude')
 
 % Interpret data using various receivers
-%samplingRxData = samplingrx(yb, symbols, n, width)
+samplingRxData = samplingrx(yb, symbols, n, width)
 %correlatingRxData = correlationrx(y, symbols, symbolpulses, n, width)
 %mfrWaveform = matchedfilterrx(y, symbolpulse, n, width);
 

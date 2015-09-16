@@ -5,7 +5,6 @@ function [pack, psd, const, eyed] = receiver(tout,fc)
 %   fc - Carrier frequency to listen on.
 
 recTime = 1; % Seconds to record waveform
-fsfd = 4*fc; % Samples per symbol
 
 pack = []; psd = [];  const=[]; eyed = [];
 
@@ -18,24 +17,18 @@ if foundMessage == 0
 end
 
 % Record the raw waveform
-noisyWaveform = recordWaveform(recTime);
+noisyWaveform = recordWaveform(recTime, fc);
 
 % Frequency/phase detection and shift to baseband
 iWaveform, qWaveform = shift2baseband(noisyWaveform, fc);
 
-% Pass the baseband signal through a low-pass filter
-iWaveformFiltered, qWaveformFiltered = lowpass(iWaveform, qWaveform);
-
 % Run waveform through the matched filter
-iMatched, qMatched = matchedFilter(iWaveformFiltered, qWaveformFiltered);
+iMatched, qMatched = matchedFilter(iWaveform, qWaveform);
 
 % Detect sampling time and sample
 symbolSequence = sampleMatched(iMatched, qMatched);
 
 % Frame synchronization and convert symbol sequence to bits
 bitSequence = symbols2bits(symbolSequence);
-
-pack = bitSequence;
-
 
 end

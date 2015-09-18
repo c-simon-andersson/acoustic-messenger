@@ -54,7 +54,7 @@ xlabel('Time (s)');
 ylabel('Amplitude')
 
 % Interpret data using various receivers
-samplingRxData = samplingrx(yb, symbols, n, width)
+%samplingRxData = samplingrx(yb, symbols, n, width)
 %correlatingRxData = correlationrx(y, symbols, symbolpulses, n, width)
 %mfrWaveform = matchedfilterrx(y, symbolpulse, n, width);
 
@@ -83,6 +83,7 @@ ylabel('|Y(f)|')
 maxYC = 2*abs(max(YC));
 plot([fc-200 fc-150 fc-150 fc-120 fc-120 fc+120 fc+120 fc+150 fc+150 fc+200], [db2mag(-25)*maxYC db2mag(-25)*maxYC db2mag(-10)*maxYC db2mag(-10)*maxYC, maxYC, maxYC, db2mag(-10)*maxYC db2mag(-10)*maxYC db2mag(-25)*maxYC db2mag(-25)*maxYC], 'color', 'g')
 
+%%
 oneToZero = sum(data) - sum(data .* samplingRxData);
 zeroToOne = sum(samplingRxData) - sum(data .* samplingRxData);
 

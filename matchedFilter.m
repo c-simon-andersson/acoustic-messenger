@@ -3,7 +3,10 @@ function [iMatched, qMatched] = matchedFilter(iWaveform, qWaveform, pulse)
 %   iWaveform/qWaveform - The waveforms
 %   pulse - The pulse to be used for constructing the filter.
 
-iMatched = 0; qMatched = 0;
+% TODO: Is this correct? Doesn't seem to work right...
+b = flip(pulse(:));
+iMatched = filter(b, 1, iWaveform);
+qMatched = filter(b, 1, qWaveform);
 
 end
 

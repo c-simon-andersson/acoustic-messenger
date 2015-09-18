@@ -6,7 +6,7 @@ function y = detectMessage(tout, fc)
 %   preamble. If it is found 1 is returned. After tout seconds of not
 %   detecting the preamble, 0 is returned.
 
-y = 0;
+y = 1;
 
 
 end

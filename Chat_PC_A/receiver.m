@@ -14,7 +14,9 @@ Ts = 1/240; % Symbol time
 
 % Data to transmit. Used to generate waveform during receiver development.
 qData = [1 0 0 1 0 0];
+qData = ones(1, 100);
 iData = [0 1 0 0 0 0];
+iData = ones(1, 100);
 
 f2 = (1+alpha)/(2*Ts); % Pulse bandwidth
 n = max(4*(fc+f2/2),4*f2); % Samples per symbol
@@ -29,33 +31,36 @@ end
 
 % Record the raw waveform
 %noisyWaveform = recordWaveform(recTime);
-[iY, qY, noisyWaveform, t] = generateWaveform(pulse, alpha, Ts, n, fc, iData, qData);
+[iY, qY, noisyWaveform, t] = generateWaveform(pulse, alpha, Ts, n, fc, pi/2, iData, qData);
 
 figure
 hold on
 grid on
 plot(t, iY, 'LineWidth', 2)
 plot(t, qY, 'LineWidth', 2)
-plot(t, noisyWaveform, '--')
+%plot(t, noisyWaveform, '--')
 
-% Frequency/phase detection and shift to baseband
-[iWaveform, qWaveform] = shift2baseband(noisyWaveform, t, fc);
+% Frequency/phase detection, shift to baseband and low pass filter
+[iWaveform, qWaveform] = shift2baseband(noisyWaveform, t, fc, Ts, n);
+
+% TODO: Do we want to do automatic gain control too?
 
 % Pass the baseband signal through a low-pass filter
 [iWaveformFiltered, qWaveformFiltered] = lowpass(iWaveform, qWaveform, n);
 
-plot(t, iWaveformFiltered)
-plot(t, qWaveformFiltered)
+%plot(t, iWaveformFiltered)
+%plot(t, qWaveformFiltered)
 
 % Run waveform through the matched filter
 [iMatched, qMatched] = matchedFilter(iWaveformFiltered, qWaveformFiltered, pulsetr(pulse, alpha, Ts, n, 2,1));
 
-figure
-hold on
-grid on
-t = 1:length(iMatched);
-plot(t, iMatched)
-plot(t, qMatched)
+%figure
+%hold on
+%grid on
+%t = 1:length(iMatched);
+%plot(t, iMatched)
+%plot(t, qMatched)
+%legend('iY', 'qY', 'iMatched', 'qMatched')
 
 % Detect sampling time and sample
 symbolSequence = sampleMatched(iMatched, qMatched);

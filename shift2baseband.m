@@ -1,8 +1,11 @@
-function [iWaveform, qWaveform]  = shift2baseband(waveform, t, fc, Ts, n)
+function [iWaveform, qWaveform]  = shift2baseband(waveform, t, fc, Ts, n, Pl)
 %shift2baseband Shifts the waveform to baseband.
 %   waveform - The waveform to shift down.
 %   t - Time values for the waveform samples.
 %   fc - The carrier frequency.
+%   Ts - Symbol period
+%   n - Samples per symbol
+%   Pl - Pilot length in symbols
 %   Shifts down the 2-dimensional waveform into its orthogonal sin and cos
 %   baseband signals.
 
@@ -21,46 +24,59 @@ epsilon = [epsilon epsilon];
 ns = 10;
 
 % Find the middle chunk of the square wave
-% TODO: Improve the detection of the beginning and end of the square wave.
-% Current implementation has problems with short pilot tones.
-c = earlyLate(iWaveform, ns, 1, epsilon);
-d = earlyLate(flip(iWaveform), ns, 1, epsilon);
-d = length(iWaveform) - d;
-middlePoint = floor(c + (d - c) / 2);
-startPoint = floor(middlePoint - (d - c) / 10);
-endPoint = floor(middlePoint + (d - c) / 10); 
+% DEPRECATED! Superseded by radius method below.
+% c = earlyLate(iWaveform, ns, 1, epsilon);
+% d = earlyLate(flip(iWaveform), ns, 1, epsilon);
+% d = length(iWaveform) - d;
+% middlePoint = floor(c + (d - c) / 2);
+% startPoint = floor(middlePoint - (d - c) / 10);
+% endPoint = floor(middlePoint + (d - c) / 10); 
+
+% Find the first point on the constellation circle
+% TODO: Could be improved by adding some lookahead to check whether the
+% next couple of points alse lie on the circle.
+radius = 0.9*sqrt(max(iWaveform)^2 + max(qWaveform)^2);
+currentPoint = 1;
+while sqrt(iWaveform(currentPoint)^2 + qWaveform(currentPoint)^2) < radius
+    currentPoint = currentPoint + 1;
+end
+startPoint = currentPoint; endPoint = startPoint + floor(n*(Pl/2));
 
 % Sum up the angles between consecutive points
-% TODO: This method is computationally expensive. Can we find some more
-% efficient solution?
+% TODO: Probably would be nicer to do this using vectors
 angle = 0;
 for currentPoint = startPoint:(endPoint - 1)
     v1 = [iWaveform(currentPoint) qWaveform(currentPoint)];
     v2 = [iWaveform(currentPoint + 1) qWaveform(currentPoint + 1)];
-    angle = angle + acos((v1 * v2') / (sqrt(sum(v1.^2)) * sqrt(sum(v2.^2))));   
+    thisAngle = acos((v1 * v2') / (sqrt(sum(v1.^2)) * sqrt(sum(v2.^2))));
+    delta = v1(1)*v2(2)-v1(2)*v2(1);
+    if delta > 0
+       thisAngle = thisAngle * -1; 
+    end
+    angle = angle + thisAngle;
 end
 
 % Calculate frequency
 angle = real(angle);
 time = (endPoint-startPoint)/n*Ts;
 period = time / (angle/(2*pi));
-frequency = 1/period;
+frequency = 1/period
 
 % Calculate sign
 % TODO: Doing this over just one sample is sensitive to noise. Should be
 % done over the entire range instead.
-delta = iWaveform(startPoint)*qWaveform(startPoint + 1) - iWaveform(startPoint + 1)*qWaveform(startPoint);
-if delta > 0
-   frequency = frequency * -1;
-end
+% delta = iWaveform(startPoint)*qWaveform(startPoint + 1) - iWaveform(startPoint + 1)*qWaveform(startPoint);
+% if delta > 0
+%    frequency = frequency * -1;
+% end
 
+%[iMatched, qMatched] = matchedFilter(iWaveform, qWaveform, pulsetr('rtrcpuls', 0.3, Ts, n, 2, 1));
 
 figure
 grid on
 hold on
 plot(t, iWaveform)
 plot(t, qWaveform)
-plot(t(middlePoint), iWaveform(middlePoint), 'ko')
 plot(t(startPoint), iWaveform(startPoint), 'bo')
 plot(t(endPoint), iWaveform(endPoint), 'bo')
 
@@ -87,7 +103,7 @@ if delta > 0
    phase = phase * -1; 
 end
 
-% Shift to baseband using calculated carrier frequency
+% Shift to baseband using calculated phase
 iWaveform = waveform * sqrt(2) .* cos(2*pi*fc*t - phase);
 qWaveform = waveform * sqrt(2) .* sin(2*pi*fc*t - phase);
 

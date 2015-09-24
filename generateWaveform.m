@@ -14,7 +14,7 @@ y = iY .* cos(2*pi*fc*t + phase) + qY .* sin(2*pi*fc*t + phase);
 % TODO: Add random delay
 
 % Add AWGN
-%y = y + awgn(y, 100);
+y = y + awgn(y, -10);
 
 
 end

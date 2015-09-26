@@ -18,29 +18,27 @@ qWaveform = waveform * sqrt(2) .* sin(2*pi*fc*t);
 % to use it. It's computationally expensive to create the filter.
 [iWaveform, qWaveform] = lowpass(iWaveform, qWaveform, n);
 
-% Find second peak using early late (skip first to avoid transients)
-epsilon = 0.000001 * max(iWaveform);
-epsilon = [epsilon epsilon];
-ns = 10;
-
-% Find the middle chunk of the square wave
-% DEPRECATED! Superseded by radius method below.
-% c = earlyLate(iWaveform, ns, 1, epsilon);
-% d = earlyLate(flip(iWaveform), ns, 1, epsilon);
-% d = length(iWaveform) - d;
-% middlePoint = floor(c + (d - c) / 2);
-% startPoint = floor(middlePoint - (d - c) / 10);
-% endPoint = floor(middlePoint + (d - c) / 10); 
+% Search forward until we find the beginning of the pilot
+currentPoint = 1;
+triggerRadius = 0.01; % Factor of highest amplitude in waveform
+radius = triggerRadius*sqrt(max(iWaveform)^2 + max(qWaveform)^2);
+while sqrt(iWaveform(currentPoint)^2 + qWaveform(currentPoint)^2) < radius
+    currentPoint = currentPoint + 1;
+end
 
 % Find the first point on the constellation circle
 % TODO: Could be improved by adding some lookahead to check whether the
 % next couple of points alse lie on the circle.
-radius = 0.9*sqrt(max(iWaveform)^2 + max(qWaveform)^2);
-currentPoint = 1;
+triggerRadius = 0.99; % Factor of highest amplitude in waveform
+maxAmplitudeInterval = floor(n*Pl/2); % Interval to search forward for the max amplitude on
+radius = triggerRadius*sqrt(max(iWaveform(currentPoint:currentPoint + maxAmplitudeInterval))^2 + max(qWaveform(currentPoint:currentPoint + maxAmplitudeInterval))^2);
 while sqrt(iWaveform(currentPoint)^2 + qWaveform(currentPoint)^2) < radius
     currentPoint = currentPoint + 1;
 end
-startPoint = currentPoint; endPoint = startPoint + floor(n*(Pl/2));
+
+% Set the start and end point to calculate angle on
+angleInterval = floor(n*Pl/4); % Length of interval to measure angle on
+startPoint = currentPoint; endPoint = startPoint + angleInterval;
 
 % Sum up the angles between consecutive points
 % TODO: Probably would be nicer to do this using vectors
@@ -61,16 +59,6 @@ angle = real(angle);
 time = (endPoint-startPoint)/n*Ts;
 period = time / (angle/(2*pi));
 frequency = 1/period
-
-% Calculate sign
-% TODO: Doing this over just one sample is sensitive to noise. Should be
-% done over the entire range instead.
-% delta = iWaveform(startPoint)*qWaveform(startPoint + 1) - iWaveform(startPoint + 1)*qWaveform(startPoint);
-% if delta > 0
-%    frequency = frequency * -1;
-% end
-
-%[iMatched, qMatched] = matchedFilter(iWaveform, qWaveform, pulsetr('rtrcpuls', 0.3, Ts, n, 2, 1));
 
 figure
 grid on

@@ -6,12 +6,12 @@ function [pack, psd, const, eyed] = receiver(tout,fc)
 barker = [1 1 1 0 0 0 1 0 0 1 0];
 n_bits = 432;
 syms_per_bit = 2;
-sym_rate = 120;
-fs = 12e3;
+sym_rate = 240;
+fs = 24e3;
 rec_bits = 16;
 
 barker_threshold = 120;
-phase_resolution = 12;
+phase_resolution = 24;
 wave_start = 1;
 
 % a = rolloff, tau = sym time, fs = sampling freq, span = number of sidelobes
@@ -30,7 +30,7 @@ LPMF = match_filter;
 
 rec = audiorecorder(fs, rec_bits, 1);
 record(rec);
-pause(0.1)
+pause(0.5)
 tic;
 %%%% main loop
 disp('recieving')
@@ -53,7 +53,10 @@ while toc < tout && isempty(pack)
         phase_shift = i * 2*pi/phase_resolution;
         MFout_real = conv(wave.*cos(2*pi*fc*t + phase_shift)*sqrt(2), LPMF); 
         MFout_imag = conv(wave.*sin(2*pi*fc*t + phase_shift)*sqrt(2), LPMF);
-
+        
+%         MFout_real = MFout_real/max(MFout_real);
+%         MFout_imag = MFout_imag/max(MFout_imag);
+        
         % Convolve the signals to find maximum correlation.
         barker_signal_real = fliplr(conv(fliplr(MFout_real), barker_filter, 'same'));
         barker_signal_imag = fliplr(conv(fliplr(MFout_imag), barker_filter, 'same'));
@@ -93,7 +96,8 @@ while toc < tout && isempty(pack)
     const = data(1,:)+1j*data(2,:);
     eyed = struct('fsfd', fs/sym_rate, 'r', MFout_real(signal_start:sample_vec(end)) + 1j*MFout_imag(signal_start:sample_vec(end)));
     psd = struct('p',[],'f',[]);
-    [psd.p,psd.f] = pwelch(wave,[],[],[],fs,'centered','power');
+    %pwelch does not play nice with the gui for some reason
+    %[psd.p,psd.f] = pwelch(wave,[],[],[],fs,'centered','power');
 end
 stop(rec)
 disp('receiver stopped')

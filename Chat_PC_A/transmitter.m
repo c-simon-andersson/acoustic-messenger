@@ -1,8 +1,8 @@
 function transmitter(packet,fc)
 % Complete the function and remove the following lines
 
-sym_rate = 120;
-fs = 12e3;
+sym_rate = 240;
+fs = 24e3;
 barker = [1 1 1 0 0 0 1 0 0 1 0];
 packet = packet';
 

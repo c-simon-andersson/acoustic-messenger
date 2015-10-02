@@ -1,72 +1,104 @@
 function [pack, psd, const, eyed] = receiver(tout,fc)
-%receiver PC_A receiver script
-%   tout - Time out for receiver. Will return after this time if no message
-%   is detected.
-%   fc - Carrier frequency to listen on.
+% Receiver with barker sequence indentification and phase correction
 
-pack = []; psd = [];  const=[]; eyed = [];
+%%%% Definitions
+[pack, psd, const, eyed] = deal([]);
+barker = [1 1 1 0 0 0 1 0 0 1 0];
+n_bits = 432;
+syms_per_bit = 2;
+sym_rate = 240;
+fs = 24e3;
+rec_bits = 16;
 
-recTime = 1; % Seconds to record waveform
-alpha = 0.3; % Roll-off
-pulse = 'rtrcpuls';
-%pulse = 'rcpuls';
-Ts = 1/240; % Symbol time
+barker_threshold = 120;
+phase_resolution = 24;
+wave_start = 1;
 
-% Data to transmit. Used to generate waveform during receiver development.
-qData = [1 0 0 1 0 0];
-qData = ones(1, 5);
-iData = [0 1 0 0 0 0];
-iData = ones(1, 5);
+% a = rolloff, tau = sym time, fs = sampling freq, span = number of sidelobes
+a = 0.35; tau = 1/sym_rate; span = 4; 
+rrc_pulse = rtrcpuls(a,tau,fs,span);
+match_filter = rrc_pulse;
 
-f2 = (1+alpha)/(2*Ts); % Pulse bandwidth
-n = max(4*(fc+f2/2),4*f2); % Samples per symbol
+barker_upsampled = upsample(barker*2-1, fs/sym_rate);
+barker_filter = conv(barker_upsampled, rrc_pulse);
 
-% Wait for a message for tout amount of time.
-foundMessage = detectMessage(tout, fc);
+%%%% Filter construction
+% LP_filter = firpm(30, [0 0.50 0.55 1], [1 1 0 0]); % TODO: Tune filter parameters
+% LPMF = conv(match_filter, LP_filter); % Combining LP and match-filter
+LPMF = match_filter;
 
-% Exit if we didn't find anything.
-if foundMessage == 0
-   return;
+
+rec = audiorecorder(fs, rec_bits, 1);
+record(rec);
+pause(0.5)
+tic;
+%%%% main loop
+disp('recieving')
+while toc < tout && isempty(pack)
+
+    wave = getaudiodata(rec, 'int16');
+    wave_end = numel(wave);
+     
+    wave = double(wave(wave_start:end)');
+    wave = wave/max(wave);
+    t = (1:numel(wave))/fs;
+    if( numel(wave) < 1.1*numel(barker_filter) )
+        continue;
+    end
+    
+    %%%% Synchronization
+    barker_center = zeros(1,phase_resolution);
+    barker_val = zeros(1,phase_resolution);
+    for i = 1:phase_resolution;
+        phase_shift = i * 2*pi/phase_resolution;
+        MFout_real = conv(wave.*cos(2*pi*fc*t + phase_shift)*sqrt(2), LPMF); 
+        MFout_imag = conv(wave.*sin(2*pi*fc*t + phase_shift)*sqrt(2), LPMF);
+        
+%         MFout_real = MFout_real/max(MFout_real);
+%         MFout_imag = MFout_imag/max(MFout_imag);
+        
+        % Convolve the signals to find maximum correlation.
+        barker_signal_real = fliplr(conv(fliplr(MFout_real), barker_filter, 'same'));
+        barker_signal_imag = fliplr(conv(fliplr(MFout_imag), barker_filter, 'same'));
+
+        barker_signal_sum = barker_signal_real+barker_signal_imag;
+        [barker_val(i),barker_center(i)] = max(barker_signal_sum);
+    end
+    [max_barker,phase_ind] = max(barker_val);
+    
+    if max_barker < barker_threshold && ~exist('sample_vec','var')
+        wave_start = wave_end;
+        continue;
+    end
+
+    signal_start = barker_center(phase_ind) + (numel(barker)/2)*fs/sym_rate;
+
+    phase_shift = phase_ind * 2*pi/phase_resolution;
+    MFout_real = conv(wave.*cos(2*pi*fc*t + phase_shift)*sqrt(2), LPMF); 
+    MFout_imag = conv(wave.*sin(2*pi*fc*t + phase_shift)*sqrt(2), LPMF);
+
+
+    %%%% Sampling
+    sample_vec = zeros(1, n_bits/syms_per_bit);
+
+    sample_vec(1) = signal_start;
+    for i = 2:numel(sample_vec)
+        sample_vec(i) = sample_vec(i-1) + fs/sym_rate;
+    end
+    
+    if sample_vec(end) > numel(wave)
+        continue;
+    end
+    
+    %%%% Output
+    data = [MFout_real(sample_vec); MFout_imag(sample_vec)];
+    pack = (sign(reshape(data, 1, n_bits))+1)/2;
+    const = data(1,:)+1j*data(2,:);
+    eyed = struct('fsfd', fs/sym_rate, 'r', MFout_real(signal_start:sample_vec(end)) + 1j*MFout_imag(signal_start:sample_vec(end)));
+    psd = struct('p',[],'f',[]);
+    %pwelch does not play nice with the gui for some reason
+    %[psd.p,psd.f] = pwelch(wave,[],[],[],fs,'centered','power');
 end
-
-% Record the raw waveform
-%noisyWaveform = recordWaveform(recTime);
-[iY, qY, noisyWaveform, t] = generateWaveform(pulse, alpha, Ts, n, fc+0.001*fc, pi/4, iData, qData);
-
-figure
-hold on
-grid on
-plot(t, iY, 'LineWidth', 2)
-plot(t, qY, 'LineWidth', 2)
-plot(t, noisyWaveform)
-legend('i reference', 'q reference', 'on carrier')
-
-% Frequency/phase detection, shift to baseband and low pass filter
-[iWaveform, qWaveform] = shift2baseband(noisyWaveform, t, fc, Ts, n, length(qData));
-
-% TODO: Do we want to do automatic gain control too?
-
-%plot(t, iWaveformFiltered)
-%plot(t, qWaveformFiltered)
-
-% Run waveform through the matched filter
-[iMatched, qMatched] = matchedFilter(iWaveform, qWaveform, pulsetr(pulse, alpha, Ts, n, 2,1));
-
-figure
-hold on
-grid on
-%t = 1:length(iMatched);
-plot(t, iMatched)
-plot(t, qMatched)
-%legend('iY', 'qY', 'iMatched', 'qMatched')
-
-% Detect sampling time and sample
-symbolSequence = sampleMatched(iMatched, qMatched);
-
-% Frame synchronization and convert symbol sequence to bits
-bitSequence = symbols2bits(symbolSequence, 0);
-
-pack = bitSequence;
-
-
+stop(rec)
+disp('receiver stopped')
 end

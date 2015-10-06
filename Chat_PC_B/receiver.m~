@@ -7,7 +7,7 @@ barker = [1 1 1 0 0 0 1 0 0 1 0];
 barker = [1 1 1 -1 -1 -1 1 -1 -1 1 -1];
 n_bits = 432;
 %n_bits = 20;
-syms_per_bit = 2;
+syms_per_bit = 4;
 sym_rate = 240;
 %fs = 24e3;
 fs = 24e3;
@@ -59,8 +59,7 @@ while toc < tout && isempty(pack)
     %%%% Synchronization
     % TODO: Replace with angle measurement and single rotation.
     barker_center = zeros(1,phase_resolution);
-    barker_val = zeros(1,phase_resolution);
-    wave_real_barker_center = zeros(1, 24); wave_imag_barker_center = zeros(1, 24);
+    barker_val = zeros(1,phase_resolution);    
     for i = 1:phase_resolution;
         phase_shift = i * 2*pi/phase_resolution;        
         MFout_real = conv(wave.*cos(2*pi*fc*t + phase_shift)*sqrt(2), LPMF); 
@@ -75,8 +74,6 @@ while toc < tout && isempty(pack)
 
         barker_signal_sum = barker_signal_real+barker_signal_imag;
         [barker_val(i),barker_center(i)] = max(barker_signal_sum);
-        wave_real_barker_center(i) = max(barker_signal_real);
-        wave_imag_barker_center(i) = max(barker_signal_imag);
     end
     [max_barker,phase_ind] = max(barker_val);
         
@@ -91,11 +88,7 @@ while toc < tout && isempty(pack)
     %signal_start = 1100;
 
     phase_shift = phase_ind * 2*pi/phase_resolution
-    %mes_angle = angle(MFout_real(barker_center(phase_ind)) + 1i*MFout_imag(barker_center(phase_ind)))
-    mes_angle = angle(wave_real_barker_center(24) + wave_imag_barker_center(24))
-    ref_angle = angle(-1-1i)
-    %phase_shift = mes_angle - ref_angle
-    phase_shift = pi - (mes_angle - ref_angle)
+    a = angle(wave(MFout_real(barker_center(phase_ind) + 1i*MFout_imag(barker_center(phase_ind))), [-1-i]))
     MFout_real = conv(wave.*cos(2*pi*fc*t + phase_shift)*sqrt(2), LPMF); 
     MFout_imag = conv(wave.*sin(2*pi*fc*t + phase_shift)*sqrt(2), LPMF);
 

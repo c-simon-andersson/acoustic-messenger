@@ -1,9 +1,8 @@
-% clear all
-close all
+clear
+close
 clc
 
 n_bits = 432;
-%n_bits = 20;
-bits = randsrc(n_bits, 1, [0 1])
+bits = randsrc(n_bits, 1, [0 1]);
 save('bits.mat', 'bits');
 transmitter(bits, 2e3);

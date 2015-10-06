@@ -52,8 +52,8 @@ while toc < tout && isempty(pack)
     end    
 
     %%%% Shift signal to baseband
-    MFout_real = conv(wave.*cos(2*pi*fc*t)*sqrt(2), LPMF);
-    MFout_imag = conv(wave.*sin(2*pi*fc*t)*sqrt(2), LPMF);
+    MFout_real = conv(wave.*cos(2*pi*fc*t)/sqrt(2), LPMF);
+    MFout_imag = conv(wave.*sin(2*pi*fc*t)/sqrt(2), LPMF);
     
     %%%% Barker Synchronization
     barker_signal_real = fliplr(conv(fliplr(MFout_real), barker_filter, 'same'));    
@@ -77,9 +77,13 @@ while toc < tout && isempty(pack)
     mes_angle = angle(MFout_real(barker_center) + 1i*MFout_imag(barker_center));
     ref_angle = angle(1+1i);
     phase_error = mes_angle - ref_angle
-    MFout_real = conv(wave.*cos(2*pi*fc*t - phase_error)*sqrt(2), LPMF); 
-    MFout_imag = conv(wave.*sin(2*pi*fc*t - phase_error)*sqrt(2), LPMF);
+    MFout_real = conv(wave.*cos(2*pi*fc*t - phase_error)/sqrt(2), LPMF); 
+    MFout_imag = conv(wave.*sin(2*pi*fc*t - phase_error)/sqrt(2), LPMF);
 
+    %%%% Automatic gain control
+    gain = 1 / sqrt(mean(MFout_real.^2 + MFout_imag.^2))
+    MFout_real = MFout_real*gain; MFout_imag = MFout_imag*gain;
+    
     %%%% Sampling
     sample_vec = zeros(1, n_bits/syms_per_bit);
 

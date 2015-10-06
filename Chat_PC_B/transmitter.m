@@ -3,19 +3,20 @@ function transmitter(packet,fc)
 
 sym_rate = 240;
 fs = 24e3;
-barker = [1 1 1 0 0 0 1 0 0 1 0];
 barker = [1 1 1 -1 -1 -1 1 -1 -1 1 -1];
 packet = packet';
 bits_per_sym = 2;
-phase_error = pi/4;
+phase_error = pi;
 
 % Insert barker code for each of the two streams
 symbols = [(barker+barker*1i) bits2symbols(packet, bits_per_sym)];
 symbols_upsampled = upsample(symbols, fs/sym_rate);
+scatter(real(symbols), imag(symbols))
 
 % a = rolloff, tau = sym time, fs = sampling freq, span = number of sidelobes
 a = 0.35; tau = 1/sym_rate; span = 4;
 rrc_pulse = rtrcpuls(a,tau,fs,span);
+mean(rrc_pulse.^2)
 
 % Construct output waveform
 output = conv(symbols_upsampled, rrc_pulse);

@@ -13,5 +13,6 @@ t = [-fliplr(t_positive(2:end)) t_positive];
 tpi = pi/tau; amtpi = tpi*(1-a); aptpi = tpi*(1 + a);
 ac = 4*a/tau; at = 16*a^2/tau^2;
 y = (sin(amtpi*t) + (ac*t).*cos(aptpi*t))./(tpi*t.*(1-at*t.^2));
-norm_factor = sqrt(sum(y.^2));
-y = y/norm_factor; % Normlaize the pulse to have unit energy
+%norm_factor = sqrt(sum(y.^2)); % Replaced with below line. //Albin
+norm_factor = sqrt(tau);
+y = y/norm_factor; % Normalize the pulse to have unit energy

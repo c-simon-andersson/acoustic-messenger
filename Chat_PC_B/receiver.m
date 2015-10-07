@@ -5,9 +5,11 @@ function [pack, psd, const, eyed] = receiver(tout,fc)
 [pack, psd, const, eyed] = deal([]);
 barker = [1 1 1 -1 -1 -1 1 -1 -1 1 -1];
 n_bits = 432;
-syms_per_bit = 2;
+syms_per_bit = 4;
 sym_rate = 240;
-fs = 24e3;
+sym_rate = 120;
+fs = 12e3;
+rec_bits = 16;
 
 barker_threshold = 120;
 wave_start = 1;
@@ -27,8 +29,8 @@ barker_filter = conv(barker_upsampled, rrc_pulse);
 LPMF = match_filter;
 
 
-%rec = audiorecorder(fs, rec_bits, 1);
-%record(rec);
+rec = audiorecorder(fs, rec_bits, 1);
+record(rec);
 pause(0.5)
 tic;
 %%%% main loop
@@ -36,18 +38,20 @@ disp('recieving')
 while toc < tout && isempty(pack)
 
     % Use for HIL
-    %wave = getaudiodata(rec, 'int16');
+    wave = getaudiodata(rec, 'int16');
     
     % Use for simulation
-    wave = load('wave.mat'); wave = wave.output; wave = wave';   
+    %wave = load('wave.mat'); wave = wave.output; wave = wave';   
     
     wave_end = numel(wave);
      
     wave = double(wave(wave_start:end)');
     wave = wave/max(wave);
     t = (1:numel(wave))/fs;
+    
+    % Check that our recording is longer than the barker filter
     if( numel(wave) < 1.1*numel(barker_filter) )
-        disp('53')         
+        disp('WARN: Recording shorter than barker sequence.')         
         continue;       
     end    
 
@@ -59,11 +63,14 @@ while toc < tout && isempty(pack)
     barker_signal_real = fliplr(conv(fliplr(MFout_real), barker_filter, 'same'));    
     barker_signal_imag = fliplr(conv(fliplr(MFout_imag), barker_filter, 'same'));
     barker_signal_sum = barker_signal_real + barker_signal_imag;
-    [max_barker, barker_center] = max(abs(barker_signal_sum));    
+    [max_barker, barker_center] = max(abs(barker_signal_sum));
+    
+%     figure; grid on;
+%     plot(barker_signal_sum)
     
     if max_barker < barker_threshold && ~exist('sample_vec','var')
         wave_start = wave_end;
-        disp('78')        
+        disp('INFO: Ran loop without finding barker sequence.')     
         continue;
     end
     
@@ -93,19 +100,19 @@ while toc < tout && isempty(pack)
     end
     
     if sample_vec(end) > numel(wave)
-        disp('99')         
+        disp('INFO: Packet continues in next recording.')         
         continue;       
     end
     
     %%%% Output    
-    data = [MFout_real(sample_vec); MFout_imag(sample_vec)];    
-    pack = samples2bits(data, syms_per_bit);     
+    data = [MFout_real(sample_vec); MFout_imag(sample_vec)];
+    pack = samples2bits(data, syms_per_bit);
     const = data(1,:)+1j*data(2,:);
     eyed = struct('fsfd', fs/sym_rate, 'r', MFout_real(signal_start:sample_vec(end)) + 1j*MFout_imag(signal_start:sample_vec(end)));
     psd = struct('p',[],'f',[]);
     %pwelch does not play nice with the gui for some reason
     %[psd.p,psd.f] = pwelch(wave,[],[],[],fs,'centered','power');
 end
-%stop(rec)
+stop(rec)
 disp('receiver stopped')
 end

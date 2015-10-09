@@ -7,7 +7,7 @@ function [pack, psd, const, eyed] = receiver(tout,fc)
 barker = [1 1 1 1 1 -1 -1 1 1 -1 1 -1 1];
 pilot = ones(1, 30);
 n_bits = 432;
-syms_per_bit = 2;
+syms_per_bit = 4;
 sym_rate = 240;
 fs = 24e3;
 rec_bits = 24;
@@ -24,18 +24,20 @@ barker_upsampled = upsample(barker*2-1, fs/sym_rate);
 barker_filter = conv(barker_upsampled, rrc_pulse);
 
 %%%% Filter construction
-Fpass = (1 + a) / (2*tau);
+Fpass = (1 + a) / (2*tau) / (fs/2);
 Fstop = Fpass*1.2;
+Fcarrier = fc / (fs/2);
 Apass = 0.01;
 Astop = 80;
-%LP_filter = firpm(60, [0 cutoff cutoff*1.1 1], [1 1 0 0]); % TODO: Tune filter parameters
+LP_filter = firpm(2048, [0 Fpass Fstop 1], [1 1 0 0]); % TODO: Tune filter parameters
+BP_filter = firpm(2048, [0 Fcarrier-Fstop Fcarrier-Fpass Fcarrier+Fpass Fcarrier+Fstop 1], [0 0 1 1 0 0]);
 %LP_filter = butter(100, cutoff);
 %d = fdesign.lowpass('Fp,Fst,Ap,Ast', cutoff,3*cutoff,0.1,60);
-filtSpecs = fdesign.lowpass(Fpass, Fstop, Apass, Astop, fs);
-Hd = design(filtSpecs, 'ellip');
-%LPMF = conv(match_filter, LP_filter); % Combining LP and match-filter
+%filtSpecs = fdesign.lowpass(Fpass, Fstop, Apass, Astop, fs);
+%Hd = design(filtSpecs, 'ellip');
+LPMF = conv(match_filter, LP_filter); % Combining LP and match-filter
 % TODO: Add low-pass filter
-LPMF = match_filter;
+%LPMF = match_filter;
 
 
 rec = audiorecorder(fs, rec_bits, 1);
@@ -49,17 +51,19 @@ while toc < tout && isempty(pack)
     
     % Use for HIL
     %wave = getaudiodata(rec, 'int16');
-    wave = getaudiodata(rec, 'double');
+    %wave = getaudiodata(rec, 'double');
     
     % Use for simulation
-    %wave = load('wave.mat'); wave = wave.output; wave = wave';   
+    wave = load('wave.mat'); wave = wave.output; wave = wave';   
     
     wave_end = numel(wave);
      
     %wave = double(wave(wave_start:end)');
     wave = wave(wave_start:end)';
+    wave = conv(wave, BP_filter, 'same');
     %max(wave)
-    wave = wave/max(wave);
+    %wave = wave/max(wave);
+    barker_threshold = 150*max(wave);
     
     t = (1:numel(wave))/fs;
     
@@ -74,8 +78,9 @@ while toc < tout && isempty(pack)
     end
     
     %%%% Shift signal to baseband
-    MFout_real = conv(filter(Hd, wave.*cos(2*pi*fc*t)), LPMF);
-    MFout_imag = conv(filter(Hd, wave.*sin(2*pi*fc*t)), LPMF);
+    % TODO: Add band-pass filter
+    MFout_real = conv(wave.*cos(2*pi*fc*t), LPMF);
+    MFout_imag = conv(wave.*sin(2*pi*fc*t), LPMF);
     %MFout_real = MFout_real / max(MFout_real); MFout_imag = MFout_imag / max(MFout_imag);
     
 %     %%%% Automatic gain control
@@ -88,8 +93,8 @@ while toc < tout && isempty(pack)
     barker_signal_sum = barker_signal_real + barker_signal_imag;
     [max_barker, barker_center] = max(abs(barker_signal_sum))    
     
-%      figure; grid on;
-%      plot(barker_signal_sum)
+%       figure; grid on;
+%       plot(barker_signal_sum)
     
     if max_barker < barker_threshold && ~exist('sample_vec','var')
         wave_start = wave_end;
@@ -128,8 +133,8 @@ while toc < tout && isempty(pack)
     phase_error = mean(mes_angle - ref_angle)
 %     ref_angle = angle(1+1i);
 %     phase_error = mes_angle - ref_angle
-    MFout_real = conv(filter(Hd, wave.*cos(2*pi*fc*t - phase_error)), LPMF); 
-    MFout_imag = conv(filter(Hd, wave.*sin(2*pi*fc*t - phase_error)), LPMF);
+    MFout_real = conv(wave.*cos(2*pi*fc*t - phase_error), LPMF); 
+    MFout_imag = conv(wave.*sin(2*pi*fc*t - phase_error), LPMF);
 
     %%%% Automatic gain control
     gain = 1 / sqrt(mean(MFout_real.^2 + MFout_imag.^2))

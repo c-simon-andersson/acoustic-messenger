@@ -3,7 +3,7 @@ sym_rate = 240;
 %sym_rate = 120;
 fs = 24e3;
 packet = packet';
-bits_per_sym = 2;
+bits_per_sym = 4;
 barker_norm = [0 sqrt(2) 0 3*sqrt(10)];
 %barker = [1 1 1 -1 -1 -1 1 -1 -1 1 -1];% / barker_norm(bits_per_sym);
 barker = [1 1 1 1 1 -1 -1 1 1 -1 1 -1 1];
@@ -32,9 +32,9 @@ output = output*gain;
 audio_obj = audioplayer(output,fs);
 disp('transmitting')
 
-output = awgn(output, 10);
+output = awgn(output, 1);
 save('wave.mat', 'output');
-playblocking(audio_obj);
+%playblocking(audio_obj);
 disp('transmission complete')
 
 end

@@ -7,6 +7,7 @@ function [pack, psd, const, eyed] = receiver(tout,fc)
 barker = [1 1 1 1 1 -1 -1 1 1 -1 1 -1 1];
 pilot = ones(1, 30);
 n_bits = 432;
+code_length = 1;
 syms_per_bit = 4;
 sym_rate = 240;
 fs = 24e3;
@@ -29,16 +30,20 @@ Fstop = Fpass*1.2;
 Fcarrier = fc / (fs/2);
 Apass = 0.01;
 Astop = 80;
-LP_filter = firpm(2048, [0 Fpass Fstop 1], [1 1 0 0]); % TODO: Tune filter parameters
-BP_filter = firpm(2048, [0 Fcarrier-Fstop Fcarrier-Fpass Fcarrier+Fpass Fcarrier+Fstop 1], [0 0 1 1 0 0]);
+%LP_filter = firpm(2048, [0 Fpass Fstop 1], [1 1 0 0]); % TODO: Tune filter parameters
+%BP_filter = firpm(2048, [0 Fcarrier-Fstop Fcarrier-Fpass Fcarrier+Fpass Fcarrier+Fstop 1], [0 0 1 1 0 0]);
 %LP_filter = butter(100, cutoff);
 %d = fdesign.lowpass('Fp,Fst,Ap,Ast', cutoff,3*cutoff,0.1,60);
 %filtSpecs = fdesign.lowpass(Fpass, Fstop, Apass, Astop, fs);
 %Hd = design(filtSpecs, 'ellip');
-LPMF = conv(match_filter, LP_filter); % Combining LP and match-filter
+%LPMF = conv(match_filter, LP_filter); % Combining LP and match-filter
 % TODO: Add low-pass filter
-%LPMF = match_filter;
+LPMF = match_filter;
 
+%save('lpmf.mat', 'LPMF');
+%save('bp.mat', 'BP_filter');
+%LPMF = load('lpmf.mat'); LPMF = LPMF.LPMF;
+%BP_filter = load('bp.mat'); BP_filter = BP_filter.BP_filter;
 
 rec = audiorecorder(fs, rec_bits, 1);
 record(rec);
@@ -60,10 +65,10 @@ while toc < tout && isempty(pack)
      
     %wave = double(wave(wave_start:end)');
     wave = wave(wave_start:end)';
-    wave = conv(wave, BP_filter, 'same');
+    %wave = conv(wave, BP_filter, 'same');
     %max(wave)
     %wave = wave/max(wave);
-    barker_threshold = 150*max(wave);
+    barker_threshold = 150*max(wave) + 1;
     
     t = (1:numel(wave))/fs;
     
@@ -77,21 +82,16 @@ while toc < tout && isempty(pack)
         continue;       
     end
     
-    %%%% Shift signal to baseband
-    % TODO: Add band-pass filter
+    %%%% Shift signal to baseband    
     MFout_real = conv(wave.*cos(2*pi*fc*t), LPMF);
     MFout_imag = conv(wave.*sin(2*pi*fc*t), LPMF);
     %MFout_real = MFout_real / max(MFout_real); MFout_imag = MFout_imag / max(MFout_imag);
     
-%     %%%% Automatic gain control
-%     gain = 1 / sqrt(mean(MFout_real.^2 + MFout_imag.^2))
-%     MFout_real = MFout_real*gain; MFout_imag = MFout_imag*gain;
-    
     %%%% Barker Synchronization
     barker_signal_real = fliplr(conv(fliplr(MFout_real), barker_filter, 'same'));
     barker_signal_imag = fliplr(conv(fliplr(MFout_imag), barker_filter, 'same'));
-    barker_signal_sum = barker_signal_real + barker_signal_imag;
-    [max_barker, barker_center] = max(abs(barker_signal_sum))    
+    barker_signal_sum = sqrt(barker_signal_real.^2 + barker_signal_imag.^2);
+    [max_barker, barker_center] = max(abs(barker_signal_sum))
     
 %       figure; grid on;
 %       plot(barker_signal_sum)
@@ -123,10 +123,9 @@ while toc < tout && isempty(pack)
         continue;       
     end
     
-    %%%% Phase synchronization
-    %mes_angle = angle(MFout_real(barker_start:fs/sym_rate:signal_start-fs/sym_rate) + 1i*MFout_imag(barker_start:fs/sym_rate:signal_start-fs/sym_rate));
-    %mes_angle = angle(MFout_real(barker_end:fs/sym_rate:signal_start-fs/sym_rate) + 1i*MFout_imag(barker_end:fs/sym_rate:signal_start-fs/sym_rate));
+    %%%% Phase synchronization    
     mes_angle = angle(MFout_real(barker_end:signal_start-fs/sym_rate) + 1i*MFout_imag(barker_end:signal_start-fs/sym_rate));
+    %mes_angle = angle(MFout_real(barker_end:signal_start) + 1i*MFout_imag(barker_end:signal_start));
     %ref_angle = angle([barker pilot] + 1i*[barker pilot]);
     %ref_angle = angle([pilot] + 1i*[pilot]);
     ref_angle = angle(1+1i);
@@ -143,6 +142,7 @@ while toc < tout && isempty(pack)
     %%%% Output    
     data = [MFout_real(sample_vec); MFout_imag(sample_vec)];
     pack = samples2bits(data, syms_per_bit);
+    pack = pack(1:432);
     const = data(1,:)+1j*data(2,:);
     eyed = struct('fsfd', fs/sym_rate, 'r', MFout_real(signal_start:sample_vec(end)) + 1j*MFout_imag(signal_start:sample_vec(end)));
     psd = struct('p',[],'f',[]);
@@ -151,6 +151,9 @@ while toc < tout && isempty(pack)
     
     figure; grid on; hold on;
     plot(MFout_real); plot(MFout_imag);
+    
+    figure; grid on; hold on;
+    plot(barker_signal_sum);
 end
 stop(rec)
 disp('receiver stopped')

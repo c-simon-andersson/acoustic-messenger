@@ -1,7 +1,8 @@
 close all
-[pack, psd, const, eyed] = receiver(5,2e3);
+[pack, psd, const, eyed] = receiver(inf,2e3);
 %load('../Chat_PC_B/bits.mat');
 load('bits.mat');
+
 if ~isempty(pack)
     scatterplot(const')
 %     syms = const(1,:)+1j*const(2,:);
@@ -10,4 +11,4 @@ if ~isempty(pack)
 else
     disp('no message received')
 end
-sprintf('Number of bit errors: %d' ,bit_errors)
+sprintf('Number of bit errors: %d',bit_errors)

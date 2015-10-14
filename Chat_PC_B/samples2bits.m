@@ -23,12 +23,13 @@ elseif n == 4 %16QAM
     samples = samples(1,:) + 1i*samples(2,:);    
     values = [-3 -1 1 3];
     s = [values+3i values+1i values-1i values-3i] / sqrt(10);
+    s = [-3-3i -3-1i -3+3i -3+1i -1-3i -1-1i -1+3i -1+1i 3-3i 3-1i 3+3i 3+1i 1-3i 1-1i 1+3i 1+1i];
+    s = s / sqrt(10);
     for k = 1:length(samples)
         [d, v] = min(abs(s - samples(k)));        
         pack((k-1)*n+1:k*n) = de2bi(v - 1, n, 'left-msb');
     end
 end
-
 
 % y = zeros(1, length(samples)*n);
 % for k = 1:length(samples)

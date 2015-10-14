@@ -5,6 +5,7 @@ load('bits.mat');
 
 if ~isempty(pack)
     scatterplot(const')
+    eyediagram(eyed.r, eyed.fsfd)
 %     syms = const(1,:)+1j*const(2,:);
 %     min_sum_dist = min(abs(syms));
     bit_errors = sum(abs(bits-pack'));

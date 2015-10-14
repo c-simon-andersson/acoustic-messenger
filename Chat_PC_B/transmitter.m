@@ -6,8 +6,11 @@ packet = packet';
 bits_per_sym = 4;
 barker = [1 1 1 1 1 -1 -1 1 1 -1 1 -1 1] / sqrt(2);
 pilot = ones(1, 40) / sqrt(2);
+
+%%%% Error simulation
 phase_error = 0;
 freq_error = 0;
+snr = inf;
 
 %%%% Insert barker code for each of the two streams
 symbols = [(barker+1i*barker) (pilot+1i*pilot) bits2symbols(packet, bits_per_sym)];
@@ -32,7 +35,7 @@ output = output / max(abs(output));
 audio_obj = audioplayer(output,fs);
 disp('transmitting')
 
-%output = awgn(output, 10);
+output = awgn(output, snr);
 save('wave.mat', 'output');
 playblocking(audio_obj);
 disp('transmission complete')

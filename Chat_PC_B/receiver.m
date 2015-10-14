@@ -6,7 +6,7 @@ function [pack, psd, const, eyed] = receiver(tout,fc)
 barker = [1 1 1 1 1 -1 -1 1 1 -1 1 -1 1] / sqrt(2);
 pilot = ones(1, 40) / sqrt(2);
 n_bits = 432;
-syms_per_bit = 3;
+syms_per_bit = 4;
 sym_rate = 120;
 fs = 48e3;
 rec_bits = 24;
@@ -39,10 +39,10 @@ while toc < tout && isempty(pack)
     pause(0.2);
     
     % Use for HIL    
-    %wave = getaudiodata(rec, 'double');
+    wave = getaudiodata(rec, 'double');
     
     % Use for simulation
-    wave = load('wave.mat'); wave = wave.output; wave = wave';   
+    %wave = load('wave.mat'); wave = wave.output; wave = wave';
     
     wave_end = numel(wave);      
     wave = wave(wave_start:end)';   
@@ -58,7 +58,7 @@ while toc < tout && isempty(pack)
     
     %%%% Shift signal to baseband    
     MFout_real = conv(wave.*cos(2*pi*fc*t), LPMF);
-    MFout_imag = conv(wave.*sin(2*pi*fc*t), LPMF);    
+    MFout_imag = conv(wave.*sin(2*pi*fc*t), LPMF);
     
     %%%% Barker Synchronization
     barker_signal_real = fliplr(conv(fliplr(MFout_real), barker_filter, 'same'));
@@ -114,7 +114,7 @@ while toc < tout && isempty(pack)
 
     %%%% Automatic gain control
     gain = 1 / sqrt(mean(MFout_real(signal_start:signal_end).^2 + MFout_imag(signal_start:signal_end).^2))
-    MFout_real = MFout_real*gain; MFout_imag = MFout_imag*gain;   
+    MFout_real = MFout_real*gain; MFout_imag = MFout_imag*gain;
     
     %%%% Output    
     data = [MFout_real(sample_vec); MFout_imag(sample_vec)];

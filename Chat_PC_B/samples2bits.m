@@ -16,17 +16,20 @@ if n == 2 %4QAM
         pack((k-1)*n+1:k*n) = de2bi(value_matrix(vi, vr), n, 'left-msb');
     end
 elseif n == 4 %16QAM
-    %     value_matrix = [0:3;4:7;8:11;12:15];
-    %     sr = [-3 -1 1 3] / 10;
-    %     si = [3 1 -1 -3] / 10;
-    %     s = [sr;si];
     samples = samples(1,:) + 1i*samples(2,:);    
-    values = [-3 -1 1 3];
-    s = [values+3i values+1i values-1i values-3i] / sqrt(10);
     s = [-3-3i -3-1i -3+3i -3+1i -1-3i -1-1i -1+3i -1+1i 3-3i 3-1i 3+3i 3+1i 1-3i 1-1i 1+3i 1+1i];
     s = s / sqrt(10);
     for k = 1:length(samples)
-        [d, v] = min(abs(s - samples(k)));        
+        [~, v] = min(abs(s - samples(k)));
+        pack((k-1)*n+1:k*n) = de2bi(v - 1, n, 'left-msb');
+    end
+elseif n == 3 %C8QAM with quasi-grey labeling
+    samples = samples(1,:) + 1i*samples(2,:);
+    a = sqrt(3);
+    s = [-a -a*1i a*1i a -1-1i 1-1i -1+1i 1+1i];
+    s = s / sqrt(20/8);
+    for k = 1:length(samples)
+        [~, v] = min(abs(s - samples(k)));
         pack((k-1)*n+1:k*n) = de2bi(v - 1, n, 'left-msb');
     end
 end
